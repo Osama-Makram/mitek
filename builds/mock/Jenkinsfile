@@ -1,0 +1,23 @@
+parameters {
+    string(name: 'SERVICE_NAME', defaultValue: 'mv4-mock-api', description: 'Matches the git repo name')
+    string(name: 'IMAGE_TAG', description: 'Docker image tag to deploy - the image URI is built automatically from the service name and this tag')
+}
+
+PIPELINE_GIT_BRANCH = '*/brad'
+def serviceDeploy(envName) {
+    node('linux2') {
+        ws("${WORKSPACE}/.${envName}.${env.SERVICE_NAME}") {
+            echo "pipelineCheckout(${PIPELINE_GIT_BRANCH})"
+            checkout([$class                           : 'GitSCM',
+                      branches                         : [[name: PIPELINE_GIT_BRANCH]],
+                      doGenerateSubmoduleConfigurations: false,
+                      userRemoteConfigs                : [[credentialsId: '1dc65493-a30c-4d1a-bcbc-f6c5f1a9ca1f',
+                                                           url          : 'git@github.mitekcloud.local:engineering/utilities.git']]])
+            utils = load 'deploy/utils.groovy'
+            utils.devDeploy(envName, env.SERVICE_NAME, env.IMAGE_TAG)
+            currentBuild.description = "Last Success ${envName}/${env.SERVICE_NAME}:${env.IMAGE_TAG}"
+        }
+    }
+}
+
+stage('DeployDev') { serviceDeploy('dev') }

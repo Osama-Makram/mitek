@@ -1,0 +1,84 @@
+{
+    "requestMetadata": {
+        "customerReferenceId": "2fa85f64-5717-4562-b3fc-2c963f66afa6"
+    },
+    "evidence": {
+        "idDocument": {
+            "pages": [
+                {
+                    "type": "IMAGE",
+                    "customerReferenceId": "6fa85f64-5717-4562-b3fc-2c963f66afa6",
+                    "imageString": "SGVsbG8sIFdvcmxkIQ==",
+                    "onDeviceClassification": {
+                        "documentSection": "FRONT",
+                        "documentType": "DRIVERS_LICENSE",
+                        "documentFeatures": [
+                            "REAL_ID",
+                            "UNDER_TWENTY_ONE"
+                        ],
+                        "issuingCountry": "USA",
+                        "issuingStateProvince": "AL",
+                        "circulationYear": "2004"
+                    }
+                },
+                {
+                    "type": "BARCODE_STRINGS",
+                    "customerReferenceId": "8fa85f64-5717-4562-b3fc-2c963f66afa6",
+                    "barcodes": [
+                        {
+                            "type": "PDF417",
+                            "barcodeString": "I AM A FAKE BARCODE STRING",
+                            "customerReferenceId": "11a85f64-5717-4562-b3fc-2c963f66afa6"
+                        },
+                        {
+                            "type": "QR",
+                            "barcodeString": "I AM A FAKE BARCODE STRING TOO",
+                            "customerReferenceId": "13a85f64-5717-4562-b3fc-2c963f66afa6"
+                        }
+                    ]
+                }
+            ],
+            "nfc": {
+                "sod": "1234",
+                "portrait": "ZmFrZSBuZmMgcG9ydHJhaXQ=",
+                "dataGroups": {
+                    "dg1":"dg1 data",
+                    "dg2":"dg2 data",
+                    "dg3":"dg3 data",
+                    "dg4":"dg4 data",
+                    "dg5":"dg5 data",
+                    "dg6":"dg6 data",
+                    "dg7":"dg7 data",
+                    "dg8":"dg8 data",
+                    "dg9":"dg9 data",
+                    "dg10":"dg10 data",
+                    "dg11":"dg11 data",
+                    "dg12":"dg12 data",
+                    "dg13":"dg13 data",
+                    "dg14":"dg14 data",
+                    "dg15":"dg15 data",
+                    "dg16":"dg16 data"
+                },
+                "activeAuthInput": {
+                    "ecdsaPublicKey": "4321",
+                    "signature": "5678",
+                    "challenge": "8765"
+                }
+            }
+        },
+        "selfie":{
+            "imageString": "SSBhbSBhIGZha2Ugc2VsZmll"
+        }
+    },
+    "configuration": {
+        "verification": {
+            "docVerify": true,
+            "verifyLevel": 2,
+            "agentReview": false,
+            "faceComparison": true
+        },
+        "extraction": {
+            "action": "INCLUDE_ALL"
+        }
+    }
+}

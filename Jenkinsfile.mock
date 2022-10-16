@@ -1,0 +1,77 @@
+pipeline {
+    agent none
+    stages { 
+        stage ('Build') {
+            agent {
+                node {
+                    label 'linux2'
+                }
+            }
+            steps { 
+                withCredentials([[$class: 'UsernamePasswordMultiBinding',
+                    credentialsId: 'c84b7039-e6fc-4164-a83c-e5d96d7b20ac',
+                    usernameVariable: 'ARTIFACTORY_CREDS_USR',
+                    passwordVariable: 'ARTIFACTORY_CREDS_PSW']]){
+                        retry(3) {
+                            script {
+                                try {
+                                    sh "sudo docker login dockerhub.mitekcloud.local -u ${ARTIFACTORY_CREDS_USR} -p ${ARTIFACTORY_CREDS_PSW}" 
+                                }              
+                                catch (e) {
+                                    echo "Login failed with error: ${e.toString()}"
+                                    echo "Retrying if retry attempt is <= 3"
+                                    throw e
+                                }
+                            }
+                        }                       
+                    }
+            
+                sh '''
+                    #!/bin/bash
+
+                    export SERVICE_NAME=mv4-mock-api
+                    export HASH=$(git rev-parse origin/${BRANCH})
+                    VFILE=$(head -n 1 ./VERSION)
+                    export VERSION="$VFILE.$BUILD_NUMBER"
+                    
+                    sudo docker build --build-arg git_hash=${HASH} --build-arg version=${VERSION} --build-arg build=$BUILD_NUMBER -f Dockerfile.mock -t ${SERVICE_NAME}:latest .
+
+                    EDGE_VERSION="${VERSION}-edge"
+                    sudo docker tag ${SERVICE_NAME}:latest dockerhub.mitekcloud.local/${SERVICE_NAME}:latest
+                    sudo docker tag ${SERVICE_NAME}:latest dockerhub.mitekcloud.local/${SERVICE_NAME}:${EDGE_VERSION}
+                    sudo docker push dockerhub.mitekcloud.local/${SERVICE_NAME}:latest
+                    sudo docker push dockerhub.mitekcloud.local/${SERVICE_NAME}:${EDGE_VERSION} 
+
+                    echo "IMAGE_TAG=${EDGE_VERSION}" > ArtifactInfo.txt
+                '''                                                                
+            }       
+            post {
+                always {
+                    script {
+                        if (fileExists('ArtifactInfo.txt')) {
+                            archiveArtifacts artifacts: 'ArtifactInfo.txt', fingerprint: true
+                            def props = readProperties file: 'ArtifactInfo.txt'
+                            build (
+                                job: 'Mv4MockApiDeploy',
+                                wait: false,
+                                parameters: [ 
+                                    [
+                                        $class: 'StringParameterValue',
+                                        name: 'SVC_GIT_BRANCH',
+                                        value: env.BRANCH
+                                    ],
+                                    [
+                                        $class: 'StringParameterValue',
+                                        name: 'IMAGE_TAG',
+                                        value: props.IMAGE_TAG
+                                    ]
+                                ]
+                            )
+                        }
+                    }
+                    cleanWs()
+                }
+            }
+        }
+    }
+}

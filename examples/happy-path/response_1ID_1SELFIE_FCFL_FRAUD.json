@@ -1,0 +1,257 @@
+{
+    "requestMetadata": {
+        "requestId": "1fa85f64-5717-4562-b3fc-2c963f66afa6",
+        "createdDateTime": "2020-11-24T15:42:28Z",
+        "customerReferenceId": "2fa85f64-5717-4562-b3fc-2c963f66afa6"
+    },
+    "processingInfo": {
+        "status": "COMPLETE",
+        "evidence": {
+            "idDocument": {
+                "evidenceId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+                "pages": [
+                    {
+                        "type": "IMAGE",
+                        "pageId": "5fa85f64-5717-4562-b3fc-2c963f66afa6",
+                        "customerReferenceId": "6fa85f64-5717-4562-b3fc-2c963f66afa6",
+                        "status": "SUCCESSFUL",
+                        "captureDetail": {
+                            "method": "MISNAP",
+                            "mode": "AUTO",
+                            "platform": "MOBILE_WEB",
+                            "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 14_1 like Mac OS X)"
+                        }
+                    },
+                    {
+                        "type": "BARCODE_STRINGS",
+                        "pageId": "7fa85f64-5717-4562-b3fc-2c963f66afa6",
+                        "customerReferenceId": "8fa85f64-5717-4562-b3fc-2c963f66afa6",
+                        "status": "SUCCESSFUL",
+                        "barcodes":[
+                            {
+                                "type": "PDF417",
+                                "barcodeId": "10a85f64-5717-4562-b3fc-2c963f66afa6",
+                                "customerReferenceId": "11a85f64-5717-4562-b3fc-2c963f66afa6",
+                                "status": "SUCCESSFUL"
+                            },
+                            {
+                                "type": "QR",
+                                "barcodeId": "12a85f64-5717-4562-b3fc-2c963f66afa6",
+                                "customerReferenceId": "13a85f64-5717-4562-b3fc-2c963f66afa6",
+                                "status": "ERROR",
+                                "failureReasons": [
+                                    "MALFORMED"
+                                ]
+                        }
+                        ]
+                    }
+                ]
+            },
+            "selfie": {
+                "evidenceId": "9fa85f64-5717-4562-b3fc-2c963f66afa6",
+                "captureDetail": {    
+                    "method": "MISNAP",
+                    "mode": "MANUAL",
+                    "platform": "IOS",
+                    "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 14_1 like Mac OS X)"
+                }
+            }
+        }
+    },
+    "classification": {
+        "idDocument": {
+            "documentType": "DRIVERS_LICENSE",
+            "documentFeatures": [
+                "REAL_ID",
+                "UNDER_TWENTY_ONE"
+            ],
+            "issuingCountry": "USA",
+            "issuingStateProvince": "AL",
+            "circulationYear": "2004"
+        },
+        "pages": [
+            {
+                "pageId": "5fa85f64-5717-4562-b3fc-2c963f66afa6",
+                "documentSection": "FRONT",
+                "documentType": "DRIVERS_LICENSE",
+                "documentFeatures": [
+                    "REAL_ID",
+                    "UNDER_TWENTY_ONE"
+                ],
+                "issuingCountry": "USA",
+                "issuingStateProvince": "AL",
+                "circulationYear": "2004"
+            },
+            {
+                "pageId": "7fa85f64-5717-4562-b3fc-2c963f66afa6",
+                "documentSection": "BACK",
+                "documentType": "DRIVERS_LICENSE",
+                "issuingCountry": "USA",
+                "issuingStateProvince": "AL",
+                "circulationYear": "2004"
+            }
+        ]
+    },
+    "extraction": {
+        "merged": {
+            "name": {
+                "fullName": "DR JOHN QUINCY ADAMS JR",
+                "prefix": "DR",
+                "firstName": "JOHN",
+                "middleName": "QUINCY",
+                "surname": "ADAMS",
+                "suffix": "JR"
+            },
+            "address": {
+                "address1": "123 MAIN STREET",
+                "address2": "APT 1",
+                "city": "SAN DIEGO",
+                "stateProvince": "CA",
+                "postalCode": "92101",
+                "country": "USA"
+            },
+            "personalInfo": {
+                "gender": "MALE",
+                "dateOfBirth": "1995-02-21",
+                "nationality": "USA",
+                "placeOfBirth": "NEWARK, NJ",
+                "personalGovId": "123-12-1234"
+            },
+            "documentInfo": {
+                "licenseClass": "C",
+                "permitType": "STUDENT",
+                "documentNumber": "99999-1",
+                "issuingAuthority": "USA",
+                "dateOfIssue": "2017-03-11",
+                "dateOfExpiry": "2022-03-11"
+            }
+        },
+        "sources": [
+            {
+                "referenceId": "5fa85f64-5717-4562-b3fc-2c963f66afa6",
+                "extractedData": {
+                    "name": {
+                        "fullName": "DR JOHN QUINCY ADAMS JR",
+                        "prefix": "DR",
+                        "firstName": "JOHN",
+                        "middleName": "QUINCY",
+                        "surname": "ADAMS",
+                        "suffix": "JR"
+                    },
+                    "address": {
+                        "address1": "123 MAIN STREET",
+                        "address2": "APT 1",
+                        "city": "SAN DIEGO",
+                        "stateProvince": "CA",
+                        "postalCode": "92101",
+                        "country": "USA"
+                    },
+                    "personalInfo": {
+                        "gender": "MALE",
+                        "dateOfBirth": "1995-02-21",
+                        "nationality": "USA",
+                        "placeOfBirth": "NEWARK, NJ",
+                        "personalGovId": "123-12-1234"
+                    },
+                    "documentInfo": {
+                        "licenseClass": "C",
+                        "permitType": "STUDENT",
+                        "documentNumber": "99999-1",
+                        "issuingAuthority": "USA",
+                        "dateOfIssue": "2017-03-11",
+                        "dateOfExpiry": "2022-03-11"
+                    }
+                }
+            },
+            {
+                "referenceId": "10a85f64-5717-4562-b3fc-2c963f66afa6",
+                "type": "BARCODE",
+                "extractedData": {
+                    "name": {
+                        "fullName": "JOHN QUINCY ADAMS",
+                        "firstName": "JOHN",
+                        "middleName": "QUINCY",
+                        "surname": "ADAMS"
+                    },
+                    "address": {
+                        "address1": "123 MAIN STREET",
+                        "address2": "APT 1",
+                        "city": "SAN DIEGO",
+                        "stateProvince": "CA",
+                        "postalCode": "92101"
+                    },
+                    "personalInfo": {
+                        "gender": "MALE",
+                        "dateOfBirth": "1995-02-21"
+                    },
+                    "documentInfo": {
+                        "documentNumber": "99999-1",
+                        "dateOfIssue": "2017-03-11",
+                        "dateOfExpiry": "2022-03-11"
+                    }
+                }
+            },
+            {
+                "referenceId": "5fa85f64-5717-4562-b3fc-2c963f66afa6",
+                "type": "MRZ",
+                "name": {
+                    "fullName": "JOHN QUINCY ADAMS",
+                    "firstName": "JOHN",
+                    "middleName": "QUINCY",
+                    "surname": "ADAMS"
+                },
+                "address": {
+                    "address1": "123 MAIN STREET",
+                    "address2": "APT 1",
+                    "city": "SAN DIEGO",
+                    "stateProvince": "CA",
+                    "postalCode": "92101"
+                },
+                "personalInfo": {
+                    "gender": "MALE",
+                    "dateOfBirth": "1995-02-21"
+                },
+                "mrzInfo": {
+                    "mrzLine1": "<<THIS<<IS<A<FAKE<MRZ<LINE1<<",
+                    "mrzLine2": "<<THIS<<IS<A<FAKE<MRZ<LINE2<<",
+                    "mrzLine3": "<<THIS<<IS<A<FAKE<MRZ<LINE3<<"
+                }
+            },
+            {
+                "referenceId": "9fa85f64-5717-4562-b3fc-2c963f66afa6",
+                "type": "NFC",
+                "extractedData": {
+                    "name": {
+                        "fullName": "JOHN QUINCY ADAMS",
+                        "firstName": "JOHN",
+                        "middleName": "QUINCY",
+                        "surname": "ADAMS"
+                    }
+                }
+            }
+        ]
+    },
+    "verification": {
+        "verified": false,
+        "confidence": 499,
+        "documentVerifications": [
+            {
+                "evidenceId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+                "verified": true
+            }
+        ],
+        "biometricVerifications": [
+            {
+                "evidenceId": "9fa85f64-5717-4562-b3fc-2c963f66afa6",
+                "verified": false,
+                "fraudReasons": ["FACE COMPARISON", "FACE LIVENESS"]
+            }
+        ]
+    },
+    "configuration": {
+        "verification": {
+            "verifyLevel": 2,
+            "agentReview": false
+        }
+    }
+}

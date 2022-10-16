@@ -1,0 +1,198 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: AWS CloudFormation template to create and push tasks for ECS.
+Parameters:
+  Env:
+    Type: String
+    Description: Specify Tag for Environment.
+    Default: dev
+  InstanceHTTPPort:
+    Type: Number
+    Description: Specifies the instance HTTP port.
+    Default: '8080'
+  EcsTaskName:
+    Type: String
+    Description: Specifies the ECS Task Name with which the resources would be associated.
+    Default: mv4-mock-api
+  ImageUrl:
+    Type: String
+    Description: Give Url for the Image you wish to use. Include tag.
+  CloudwatchLogsGroup:
+    Type: String
+    Description: Give lowercase environment name only. The template will handle the
+      rest.
+  EcsClusterName:
+    Type: String
+    Description: ECS cluster name to deploy the Service on.
+  DesiredTaskNum:
+    Type: String
+    Description: Desired number of tasks for the service.
+    Default: '1'
+  VpcId:
+    Description: The VPC ID
+    Type: String
+    ConstraintDescription: must be a valid VPC ID
+  Hostname:
+    Type: String
+    Description: The friendly hostname of this service.
+    Default: mv4-mock-api
+  DNSDomain:
+    Description: The private domain of the DNS
+    Type: String
+  ALBDNSName:
+    Description: The DNS name of the ALB
+    Type: String
+  ALBListenerArn:
+    Description: Must be a valid ARN.
+    Type: String
+  ServiceDiscoveryNamespace:
+    Type: String
+    Description: The namespace to use for service discovery.
+  HttpContainerMemoryReservation:
+    Type: Number
+    Description: The soft limit (in MiB) of memory to reserve for the container.
+    Default: '256'
+  HttpContainerCpuReservation:
+    Type: Number
+    Description: The minimum number of CPU units to reserve for the container.
+    Default: '256'
+  TaskMemoryHardLimit:
+    Type: String
+    Description: Hard limit for the containers memory
+    Default: '256'
+Resources:
+  Task:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Join
+        - '-'
+        - - !Ref 'EcsTaskName'
+          - !Ref 'Env'
+      ContainerDefinitions:
+        - Name: !Join
+            - '-'
+            - - !Ref 'EcsTaskName'
+              - http
+          Environment:
+            - Name: PORT
+              Value: !Ref 'InstanceHTTPPort'
+          Image: !Ref 'ImageUrl'
+          Cpu: !Ref 'HttpContainerCpuReservation'
+          PortMappings:
+            - ContainerPort: !Ref 'InstanceHTTPPort'
+              HostPort: 0
+              Protocol: tcp
+          Essential: true
+          MemoryReservation: !Ref 'HttpContainerMemoryReservation'
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Join
+                - '-'
+                - - !Ref 'CloudwatchLogsGroup'
+                  - docker
+                  - service
+              awslogs-region: !Ref 'AWS::Region'
+              awslogs-stream-prefix: !Join
+                - '-'
+                - - !Ref 'EcsTaskName'
+                  - !Ref 'Env'
+          Memory: !Ref 'TaskMemoryHardLimit'
+      Volumes: []
+      NetworkMode: bridge
+      TaskRoleArn: !Ref 'TaskRole'
+  Service:
+    Type: AWS::ECS::Service
+    Properties:
+      Cluster: !Ref 'EcsClusterName'
+      DesiredCount: !Ref 'DesiredTaskNum'
+      LoadBalancers:
+        - ContainerName: !Join
+            - '-'
+            - - !Ref 'EcsTaskName'
+              - http
+          ContainerPort: !Ref 'InstanceHTTPPort'
+          TargetGroupArn: !Ref 'MockAPITG'
+      PlacementStrategies:
+        - Field: attribute:ecs.availability-zone
+          Type: spread
+        - Field: instanceId
+          Type: spread
+      TaskDefinition: !Ref 'Task'
+      ServiceRegistries:
+        - ContainerName: !Join
+            - '-'
+            - - !Ref 'EcsTaskName'
+              - http
+          ContainerPort: !Ref 'InstanceHTTPPort'
+          RegistryArn: !GetAtt 'ServiceDiscovery.Arn'
+      DeploymentConfiguration:
+        MinimumHealthyPercent: 50
+        MaximumPercent: 200
+    DependsOn: ECSALBListenerRule
+  ServiceDiscovery:
+    Type: AWS::ServiceDiscovery::Service
+    Properties:
+      DnsConfig:
+        DnsRecords:
+          - Type: SRV
+            TTL: 10
+        NamespaceId: !Ref 'ServiceDiscoveryNamespace'
+      Name: !Ref 'Hostname'
+      HealthCheckCustomConfig:
+        FailureThreshold: 1
+  TaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Sid: ''
+            Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+  ECSALBListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      Actions:
+      - Type: forward
+        TargetGroupArn:
+          Ref: MockAPITG
+      Conditions:
+      - Field: host-header
+        Values:
+        - Fn::Sub: "${Hostname}.${DNSDomain}"
+      ListenerArn:
+        Ref: ALBListenerArn
+      Priority: 64
+  MockAPITG:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckIntervalSeconds: 60
+      HealthCheckPath: /mock/health
+      HealthCheckProtocol: HTTP
+      UnhealthyThresholdCount: 2
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      Protocol: HTTP
+      Port: 80
+      VpcId: !Ref 'VpcId'
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: '25'
+  HttpCname:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneName: !Sub '${DNSDomain}.'
+      Comment: Friendly DNS name
+      Name: !Sub '${Hostname}.${DNSDomain}'
+      Type: CNAME
+      TTL: 900
+      ResourceRecords:
+        - Ref: ALBDNSName
+  UrlParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Type: String
+      Name: !Sub '/${Env}/Mv4MockApiUrl'
+      Value: !Sub 'https://${Hostname}.${DNSDomain}'

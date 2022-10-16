@@ -1,0 +1,2451 @@
+openapi: 3.0.3
+info:
+  version: 0.0.3
+  title: MV4 API
+  license:
+    name: Mitek Systems Proprietary
+servers:
+  - url: /mock
+paths:
+  /health:
+    # See production standards for health check:
+    # https://miteksystems.atlassian.net/wiki/spaces/AG/pages/1918140809/Production+Standards+-+Services#Service-must-have-a-health-check
+    get:
+      description: Request to perform a health check of the API
+      operationId: health
+      responses:
+        200:
+          description: "Service initialized"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthCheck"
+              example:
+                generated_at: "2021-06-23T09:25:00.000Z"
+                duration_millis: 21.3
+        503:
+          description: "Service unavailable"
+
+  /oauth2/token:
+    post:
+      description: |-
+        The client makes a request to the token endpoint by sending the
+        following parameters using the "application/x-www-form-urlencoded" HTTP
+        request entity-body.
+      operationId: oauth2Token
+      parameters:
+        - name: grant_type
+          in: query
+          example: client_credentials
+          schema:
+            type: string
+        - name: client_id
+          in: query
+          schema:
+            type: string
+            example: "80eccd06-f690-4cc1-afc7-cad76dcb85a3"
+        - name: client_secret
+          in: query
+          schema:
+            type: string
+            example: "secret"
+        - name: scope
+          in: query
+          schema:
+            type: string
+            example: "verify.v4.id-document.manual.write"
+          description: |-
+            Indicating the service(s) being used. The following are the possible
+            options:
+            - verify.v4.id-document.manual.write
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                grant_type:
+                  type: string
+                client_id:          
+                  type: string
+                client_secret:  
+                  type: string
+                scope:
+                  type: string
+
+      responses:
+        '200':
+          description: oauth2TokenResponse
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/oauth2TokenResponse'
+        '400':
+          description: genericError
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/genericError'
+        '401':
+          description: genericError
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/genericError'
+        '500':
+          description: genericError
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/genericError'
+
+  /poll:
+    get:
+      description: |
+        Mitek has implemented a polling approach for the retrieval of results via our asynchronous APIs. The polling
+        API provides details of the state of all currently in-process and completed transactions to customers on a
+        per-tenant basis. Completed transactions will be available for a limited amount of time. When leveraging the API,
+        Mitek recommends a polling interval of 5 seconds and will start to return a 429 response if polling exceeds 1 API
+        call per second.
+
+        Polling is implemented as a simple `GET` operation on the polling end-point and will return a list of current
+        transactions for the tenant with details of their current status (PROCESSING, COMPLETED, or ERROR).
+      operationId: poll
+      parameters:
+        - name: requestStatus
+          in: query
+          example: COMPLETE
+          schema:
+            type: string
+          description: |-
+            The current status of the transaction. “COMPLETE” and “PENDING” are the only valid values. A blank value or missing field indicates no limitation by the status.
+        - name: requestDateStart
+          in: query
+          schema:
+            type: string
+            format: date-time
+            example: "2021-09-23T09:25:00.000Z"
+          description: |-
+            Transactions that were initiated on or after this date/time. A blank value or missing field indicates no lower date limit.
+        - name: requestDateEnd
+          in: query
+          schema:
+            type: string
+            format: date-time
+            example: "2021-09-23T09:25:00.000Z"
+          description: |-
+           Transactions that were initiated on or before this date/time. A blank value or missing field indicates no upper date limit.
+        - name: requestExpiryStart
+          in: query
+          schema:
+            type: string
+            format: date-time
+            example: "2021-09-23T09:25:00.000Z"
+          description: |-
+            Transactions that will expire on or after this date/time. A blank value or missing field indicates no lower date limit. Expiration of a transaction implies that it is complete.
+        - name: requestExpiryEnd
+          in: query
+          schema:
+            type: string
+            format: date-time
+            example: "2021-09-23T09:25:00.000Z"
+          description: |-
+            Transactions that will expire on or before this date/time. A blank value or missing field indicates no upper date limit. Expiration of a transaction implies that it is complete.
+        - name: responseMaxCount
+          in: query
+          schema:
+            type: integer
+          description: |-
+            The maximum number of records to be returned in the polling response. A blank value or missing field indicates no maximum number of transactions
+        - name: responseRetrieved
+          in: query
+          schema:
+            type: boolean
+          description: |-
+            Transactions that either have or have not been retrieved already via either the retrieval endpoint or synchronous response. “Via synchronous response” means the synchronous response to the original transaction had a transaction status of COMPLETE.
+            A blank value or missing field indicates transactions that have and have not been retrieved.
+      security:
+        - BearerToken: []  
+      responses:
+        200:
+          description: |
+            All of Mitek's asynchronous APIs leverage a polling approach for statusing and retrieval of responses. Each 
+            request to the polling API will return the details of all current documents that are in process with their 
+            associated status (PROCESSING, COMPLETED, or ERROR). The polling response will only return the details of
+            those documents that have not yet completed or have not yet been retrieved from the platform. Once final
+            results have been retrieved from the retrieval end-point, the polling API will no longer return the
+            transaction status in the response. Furthermore, completed transactions will be deleted after seven days.
+            The transaction has to be resubmitted after that period of time to recreate the results.
+          content:
+            application/json:
+              schema:
+                  $ref: "#/components/schemas/TransactionPollingResult"
+              example:
+                - service: "VERIFY_AUTO"
+                  requestId: "5c572530-cea8-40d5-b3d7-f9e127a42035"
+                  customerReferenceId: "CUSTOMER PROVIDED REFERENCE ID"
+                  retrievalId: "4c52b0ef-aa28-4675-85d7-207b00486520"
+                  processingStatus: "PENDING"
+                  requestDate: "2021-09-23T09:25:00.000Z"
+                  expiryDate: "2021-12-23T09:25:00.000Z"
+                  responseRetrieved: false
+                - service: "VERIFY_EXPERT"
+                  requestId: "7bd9aada-d538-4f48-807f-3ba97428e770"
+                  customerReferenceId: "CUSTOMER PROVIDED REFERENCE ID"
+                  retrievalId: "1a55b710-def3-4bc2-89c8-17cefd8c7c98"
+                  processingStatus: "COMPLETE"
+                  requestDate: "2021-06-23T09:25:00.000Z"
+                  expiryDate: "2021-08-23T09:25:00.000Z"
+                  responseRetrieved: true
+        401:
+          $ref: "#/components/responses/NotAuthorized"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        408:
+          $ref: "#/components/responses/RequestTimeout"
+        429:
+          $ref: "#/components/responses/TooManyRequests"
+        500:
+          $ref: "#/components/responses/InternalServerError"
+        503:
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /verify:
+    post:
+      description: |
+        Each auto processing request should include at least one identity document. An identity document can consist of
+        one or two images depending on the type of document being processed. Optionally, the API also supports
+        submission of a selfie image as part of the request to support face comparison between the photo located on the
+        identity document and a selfie provided, as well as perform liveness detection to determine if the selfie was
+        from a live person. In the submitted request, the API requires a single image for each page of a given identity
+        document to be submitted. An example being if a drivers license is submitted, successful processing will require
+        submission of images of both the front and back (or back barcode string) of the document.
+
+        Depending on the level of processing required, transaction results may come either synchronously (via automated
+        processing) or asynchronously (via Agent review). If the transaction requires an Agent review, this will be
+        indicated in the initial response from the API. Results retrieval is built around a polling approach described
+        in this document.
+      operationId: verify
+      parameters:
+        - in: header
+          name: "X-Simulated-Content"
+          style: simple
+          explode: true
+          schema:
+            $ref: "#/components/schemas/SimulatedContentObject"
+          examples:
+            AllGood:
+              $ref: "#/components/examples/AllGoodHeaders"
+            AcceptanceFailure:
+              $ref: "#/components/examples/AcceptanceFailureHeaders"
+            ExtractionFailure:
+              $ref: "#/components/examples/ExtractionFailureHeaders"
+            ClassificationFailure:
+              $ref: "#/components/examples/ClassificationFailureHeaders"
+            DocFraudPortraitZone:
+              $ref: "#/components/examples/DocFraudPortraitZoneHeaders"
+            DocFraudDocStructure:
+              $ref: "#/components/examples/DocFraudDocStructureHeaders"
+            DocFraudBioDataConsistency:
+              $ref: "#/components/examples/DocFraudBioDataConsistencyHeaders"
+            DocFraudBioDataFonts:
+              $ref: "#/components/examples/DocFraudBioDataFontsHeaders"
+            DocFraudBarcode:
+              $ref: "#/components/examples/DocFraudBarcodeHeaders"
+            DocFraudGeneralFraud:
+              $ref: "#/components/examples/DocFraudGeneralFraudHeaders"
+            DocFraudIncompleteEvidence:
+              $ref: "#/components/examples/DocFraudIncompleteEvidenceHeaders"
+            DocFraudKnownFraud:
+              $ref: "#/components/examples/DocFraudKnownFraudHeaders"
+            DocFraudMrzFonts:
+              $ref: "#/components/examples/DocFraudMrzFontsHeaders"
+            DocFraudMrzCheckDigit:
+              $ref: "#/components/examples/DocFraudMrzCheckDigitHeaders"
+            DocFraudNfc:
+              $ref: "#/components/examples/DocFraudNfcHeaders"
+            DocFraudPhotocopy:
+              $ref: "#/components/examples/DocFraudPhotocopyHeaders"
+            DocFraudSecurityFeatures:
+              $ref: "#/components/examples/DocFraudSecurityFeaturesHeaders"
+            BiometricFraudFaceComparison:
+              $ref: "#/components/examples/BiometricFraudFaceComparisonHeaders"
+            BiometricFraudFaceLiveness:
+              $ref: "#/components/examples/BiometricFraudFaceLivenessHeaders"
+        - in: header
+          name: "X-Agent-Time"
+          schema:
+            type: number
+          examples:
+            0:
+              value: 0
+            30:
+              value: 30
+            60:
+              value: 60
+            120:
+              value: 120
+            300:
+              value: 300
+        - in: header
+          name: "documentType"
+          schema:
+            type: string
+          example: "PP"
+        - in: header
+          name: "documentCountry"
+          schema:
+            type: string
+          example: "USA"
+      security:
+        - BearerToken: []  
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VerifyRequest"
+            examples:
+              SampleRequest:
+                value:
+                  customerReferenceId: 2fa85f64-5717-4562-b3fc-2c963f66afa6
+                  pages:
+                    - customerReferenceId: 6fa85f64-5717-4562-b3fc-2c963f66afa6
+                      image: SGVsbG8sIFdvcmxkIQ==
+                      onDeviceClassification:
+                        documentSection: FRONT
+                        documentType: DRIVERS_LICENSE
+                        documentFeatures:
+                        - REAL_ID
+                        - UNDER_TWENTY_ONE
+                        issuingCountry: USA
+                        issuingStateProvince: AL
+                        circulationYear: '2004'
+                    - customerReferenceId: 8fa85f64-5717-4562-b3fc-2c963f66afa6
+                      image: SGVsbG8sIFdvcmxkIQ==
+                      onDeviceClassification:
+                        documentSection: BACK
+                        documentType: DRIVERS_LICENSE
+                        documentFeatures:
+                        - REAL_ID
+                        - UNDER_TWENTY_ONE
+                        issuingCountry: USA
+                        issuingStateProvince: AL
+                        circulationYear: '2004'
+                  pdf417:
+                    customerReferenceId: 13a85f64-5717-4562-b3fc-2c963f66afa6
+                    barcodeString: I AM A FAKE BARCODE STRING
+                    onDeviceClassification:
+                      documentSection: BACK
+                      documentType: DRIVERS_LICENSE
+                      documentFeatures: []
+                      issuingCountry: USA
+                      issuingStateProvince: AL
+                      circulationYear: '2004'
+                  qr:
+                    customerReferenceId: 13a85f64-5717-4562-b3fc-2c963f66afa6
+                    barcodeString: I AM A FAKE BARCODE STRING
+                  nfc:
+                    sod: A312E205468697320697320612074657374205468697320697320612074657374
+                    portrait: ZmFrZSBuZmMgcG9ydHJhaXQ=
+                    dataGroups:
+                      dg1: 322E205365642075742070657273706963696174697320756E6465206F6D6E6973
+                      dg2: 332E207175616520616220696C6C6F20696E76656E746F726520766572697461746973206574
+                      dg15: 342E2061737065726E6174757220617574206F646974206175742066756769742C20736564
+                    activeAuthInput:
+                      ecdsaPublicKey: 352E206573742C2071756920646F6C6F72656D20697073756D207175696120646F6C6F72
+                      signature: 362E20646F6C6F7265206D61676E616D20616C697175616D2071756165726174
+                      challenge: 372E206C61626F72696F73616D
+                  selfie: SSBhbSBhIGZha2Ugc2VsZmll
+                  configuration:
+                    verification:
+                      docVerify: true
+                      verifyLevel: 1
+                      agentReview: false
+                      faceComparison: true
+                    extraction:
+                      action: EXCLUDE
+                      fields: ["Surname", "City", "DateOfBirth"]
+                    responseImages:
+                      - CroppedPortrait
+                      - CroppedSignature
+                      - CroppedDocument
+      responses:
+        200:
+          description: Verification response for an identity using the evidence provided in the request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VerifyResponse"
+              examples:
+                SampleResponse:
+                  $ref: "#/components/examples/SampleVerifyResponse"
+                  
+        201:
+          description: Verification response when the request is processing in the background.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VerifyAsyncResponse"
+              example:
+                requestId: "4d6a4dc2-a756-4479-99c2-a856b41456c6"
+                customerRefereneceId: "CUSTOMER PROVIDED IDENTIFIER"
+        401:
+          $ref: "#/components/responses/NotAuthorized"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        408:
+          $ref: "#/components/responses/RequestTimeout"
+        429:
+          $ref: "#/components/responses/TooManyRequests"
+        500:
+          $ref: "#/components/responses/InternalServerError"
+        503:
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /verify/{retrievalId}:
+    get:
+      description: |
+        Results retrieval is the final step in manual review processing. To
+        retrieve a final result from the platform, a GET request is submitted to
+        the API with the `retrievalId` that is returned from the polling API.
+      operationId: retrieve
+      parameters:
+        - in: path
+          required: true
+          name: retrievalId
+          schema:
+            type: string
+            format: uuid
+                
+      security:
+        - BearerToken: []
+      responses:
+        200:
+          description: Verification response for an identity using the evidence provided in the request.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/VerifyResponse"
+                  - $ref: "#/components/schemas/VerifyAsyncResponse"
+              examples:
+                SampleResponse:
+                  $ref: "#/components/examples/SampleVerifyResponse"
+
+        401:
+          $ref: "#/components/responses/NotAuthorized"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        404:
+          $ref: "#/components/responses/NotFound"
+        408:
+          $ref: "#/components/responses/RequestTimeout"
+        429:
+          $ref: "#/components/responses/TooManyRequests"
+        500:
+          $ref: "#/components/responses/InternalServerError"
+        503:
+          $ref: "#/components/responses/ServiceUnavailable"
+
+components:
+  securitySchemes:
+
+    BearerToken:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Enter token value **only**. "Bearer " will be automatically prefixed in the Authorization header.
+  
+  schemas:
+    Error:
+      type: object
+      required:
+        - message
+      properties:
+        requestId:
+          type: string
+          format: uuid
+        message:
+          type: string
+
+    HealthCheck:
+      type: object
+      required:
+        - generated_at
+        - duration_millis
+      properties:
+        generated_at:
+          type: string
+          format: date-time
+          description: The ISO8601 date and time representing the start of the healthcheck report
+        duration_millis:
+          type: number
+          description: The number of milliseconds that the healthecheck took to generate
+      additionalProperties: false
+      example:
+        generated_at: "2021-06-23T17:32:28Z"
+        duration_millis: 17.8
+
+    VerifyRequest:
+      type: object
+      required:
+        - pages
+      properties:
+        requestId:
+          type: string
+          format: uuid
+          readOnly: true
+        createdDateTime:
+          type: string
+          format: date-time
+          readOnly: true
+          example: "2017-07-21T17:32:28Z"
+        customerReferenceId:
+          type: string
+          description: Customer provided identifier for the request
+        pages:
+          type: array
+          items:
+            $ref: "#/components/schemas/DocumentPageRequest"
+          description: |
+            Array object containing evidence information for each page of an identity document. Not applicable for
+            non-document evidence (e.g. selfies)
+        pdf417:
+          type: object
+          required:
+            - barcodeString
+          properties:
+            customerReferenceId:
+              type: string
+              description: Customer provided identifier
+              format: uuid
+            barcodeString:
+              type: string
+              description: Barcode string (if evidence is a barcode extracted during capture)
+            onDeviceClassification:
+              type: object
+              description: Information about the image as captured by the device (only applicable for MiSnap SDK users)
+              allOf:
+                - $ref: "#/components/schemas/DocumentPageClassification"
+        qr:
+          type: object
+          required:
+            - barcodeString
+          properties:
+            customerReferenceId:
+              type: string
+              description: Customer provided identifier
+              format: uuid
+            barcodeString:
+              type: string
+              description: Barcode string (if evidence is a barcode extracted during capture)
+        nfc:
+          type: object
+          writeOnly: true
+          allOf:
+            - $ref: "#/components/schemas/Nfc"
+          description: |
+            Object containing evidence sourced from an NFC chip on the document - this section applies when the evidence
+            type is **ID_DOCUMENT**.
+        selfie:
+          type: string
+          format: byte
+          description: Base64-encoded image of the selfie
+        configuration:
+          $ref: "#/components/schemas/ConfigurationRequest"
+
+    VerifyResponse:
+      type: object
+      required:
+        - requestMetadata
+        - processingInfo
+      properties:
+        requestId:
+          type: string
+          format: uuid
+          readOnly: true
+        createdDateTime:
+          type: string
+          format: date-time
+          readOnly: true
+          example: "2017-07-21T17:32:28Z"
+        customerReferenceId:
+          type: string
+          description: Customer provided identifier for the request
+        Mitek-Server-Processing-Time:
+          type: integer
+          description: Time in milliseconds for the server to provide the response
+        Mitek-Request-Id:
+          type: string
+          format: uuid
+          description: The internal Mitek request ID
+        processingInfo:
+          $ref: "#/components/schemas/ProcessingInfo"
+        classification:
+          $ref: "#/components/schemas/Classification"
+        extraction:
+          $ref: "#/components/schemas/Extraction"
+        verification:
+          $ref: "#/components/schemas/Verification"
+        configuration:
+          $ref: "#/components/schemas/ConfigurationResponse"
+        responseImages:
+          $ref: "#/components/schemas/ResponseImages"
+    
+    VerifyAsyncResponse:
+      type: object
+      required:
+        - requestId
+        - customerReferenceId
+      properties:
+        requestId:
+          $ref: "#/components/schemas/RequestMetadata/properties/requestId"
+        customerReferenceId:
+          $ref: "#/components/schemas/RequestMetadata/properties/customerReferenceId"
+    
+    RequestMetadata:
+      type: object
+      properties:
+        requestId:
+          type: string
+          format: uuid
+          readOnly: true
+        createdDateTime:
+          type: string
+          format: date-time
+          readOnly: true
+          example: "2017-07-21T17:32:28Z"
+        customerReferenceId:
+          type: string
+          description: Customer provided identifier for the request
+
+    ProcessingInfo:
+      type: object
+      description: Object containing information about the processing of the transaction
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          description: |
+            The current status of the request associated to the request ID
+
+            **PROCESSING**: Still processing (callback needed)
+
+            **COMPLETED**: All details in the response
+
+            **ERROR**: Transaction failed
+          enum:
+            - PROCESSING
+            - COMPLETED
+            - ERROR
+        pages:
+          type: array
+          items:
+            $ref: "#/components/schemas/DocumentPageResponse"
+          description: Array object containing page-level info about the document
+        barcodes:
+          type: array
+          items:
+            $ref: "#/components/schemas/BarcodesResponse"
+        selfie:
+          $ref: "#/components/schemas/SelfieResponse"
+
+    EvidenceRequest:
+      type: object
+      description: |
+         Object containing all evidence submitted to Mobile Verify in the transaction - while no individual type of
+         evidence is required, a transaction does require submission of evidence
+      properties:
+        idDocument:
+          $ref: "#/components/schemas/DocumentRequest"
+        selfie:
+          $ref: "#/components/schemas/SelfieRequest"
+
+    DocumentRequest:
+      type: object
+      description: Object containing evidence information for the identity document portion of the transaction
+      required:
+        - pages
+      properties:
+        pages:
+          type: array
+          items:
+            $ref: "#/components/schemas/DocumentPageRequest"
+          description: |
+            Array object containing evidence information for each page of an identity document. Not applicable for
+            non-document evidence (e.g. selfies)
+        nfc:
+          type: object
+          writeOnly: true
+          allOf:
+            - $ref: "#/components/schemas/Nfc"
+          description: |
+            Object containing evidence sourced from an NFC chip on the document - this section applies when the evidence
+            type is **ID_DOCUMENT**.
+
+    SelfieRequest:
+      type: object
+      description: Object containing evidence information for the selfie portion of the transaction
+      required:
+        - imageString
+      properties:
+        imageString:
+          type: string
+          format: byte
+          description: Base64-encoded image of the selfie
+
+    DocumentPageRequest:
+      $ref: "#/components/schemas/ImagePageRequest"
+          
+    DocumentPageRequestCommon:
+      type: object
+      properties:
+        customerReferenceId:
+          type: string
+          description: Customer provided identifier
+        onDeviceClassification:
+          type: object
+          description: Information about the image as captured by the device (only applicable for MiSnap SDK users)
+          allOf:
+            - $ref: "#/components/schemas/DocumentPageClassification"
+
+    ImagePageRequest:
+      allOf:
+        - $ref: "#/components/schemas/DocumentPageRequestCommon"
+        - type: object
+        - required:
+            - image
+          properties:
+            image:
+              type: string
+              format: byte
+              description: Base64-encoded image of one page of the document
+
+    BarcodePageRequest:
+      allOf:
+        - $ref: "#/components/schemas/DocumentPageRequestCommon"
+        - type: object
+        - required:
+            - barcodes
+          properties:
+            barcodes:
+              type: array
+              description: |
+                If the type is **BARCODE_STRINGS**, an array object containing all barcodes found on the page (if
+                extracted during the capture process). Note that we either extract a barcode or the page image it's on,
+                not both.
+              items:
+                properties:                  
+                  barcodeId:
+                    type: string
+                    format: uuid
+                  customerReferenceId:
+                    type: string
+                    description: Customer provided identifier for the request     
+                  type:
+                    type: string
+                    default: PDF417
+                    enum:
+                      - PDF417
+                      - 1D
+                      - QR
+                    description: The type of barcode being sent
+                  barcodeString:
+                    type: string
+                    description: Barcode string from the page of the document
+
+    EvidenceResponse:
+      type: object
+      description: Object containing processing information about each piece of evidence provided
+      properties:
+        idDocument:
+          $ref: "#/components/schemas/DocumentResponse"
+        selfie:
+          $ref: "#/components/schemas/SelfieResponse"
+
+    DocumentResponse:
+      type: object
+      description: Object containing info about the document portion of the evidence
+      required:
+        - evidenceId
+        - pages
+      properties:
+        evidenceId:
+          type: string
+          format: uuid
+          description: Id which uniquely identifies the evidence
+        pages:
+          type: array
+          items:
+            $ref: "#/components/schemas/DocumentPageResponse"
+          description: Array object containing page-level info about the document
+
+    SelfieResponse:
+      type: object
+      description: Object containing information about the selfie portion of the evidence
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          description: The current status of the request associated to the selfie evidence
+          enum:
+            - COMPLETED
+            - PROCESSING
+            - FAILED
+        failureReasons:
+          type: array     
+          items:
+            type: string
+          description: If the status is “Failed,” array of reasons for the failure - code /description pairs     
+        captureDetail:
+          type: object
+          readOnly: true
+          allOf:
+            - $ref: "#/components/schemas/CaptureDetail"
+
+    DocumentPageResponse:
+      $ref: "#/components/schemas/ImagePageResponse"
+
+    BarcodesResponse:
+      properties:                  
+        barcodeId:
+          type: string
+          format: uuid
+        customerReferenceId:
+          type: string
+          description: Customer provided identifier for the request     
+        type:
+          type: string
+          default: PDF417
+          enum:
+            - PDF417
+            - 1D
+            - QR
+          description: The type of barcode that was submitted
+        status:
+          type: string
+          description: |
+            The current status of the request associated to the page ID
+
+            **PROCESSING**: Still processing (callback needed)
+
+            **COMPLETED**: All details in the response
+
+            **ERROR**: Transaction failed
+          enum:
+            - PROCESSING
+            - COMPLETED
+            - ERROR
+        failureReasons:
+          allOf:
+            - $ref: "#/components/schemas/ProcessingFailureReasons"
+            - type: object
+              description: If the status is **ERROR**, array of reasons for the failure (code/description pairs)
+              example: 
+                500: The barcode could not be found.
+                503: The barcode could not be processed. 
+          
+    DocumentPageResponseCommon:
+      type: object
+      required:
+        - pageId
+        - status
+      properties:
+        pageId:
+          type: string
+          format: uuid
+          description: Id which uniquely identifies the page
+        customerReferenceId:
+          type: string
+          description: Customer provided identifier
+        status:
+          type: string
+          readOnly: true
+          description: |
+            The current status of the request associated to the page ID
+
+            **PROCESSING**: Still processing (callback needed)
+
+            **COMPLETED**: All details in the response
+
+            **ERROR**: Transaction failed
+          enum:
+            - PROCESSING
+            - COMPLETED
+            - ERROR
+        captureDetail:
+          type: object
+          allOf:
+            - $ref: "#/components/schemas/CaptureDetail"
+        failureReasons:
+          allOf:
+            - $ref: "#/components/schemas/ProcessingFailureReasons"
+            - type: object
+              description: |
+                If the status is **ERROR**, object of reasons for the failure - code/description pairs (formerly known
+                as **processingReasons**)
+              example:
+                201: The image is not sharp
+                206: The type of ID document could not be determined.
+
+    ImagePageResponse:
+      allOf:
+        - $ref: "#/components/schemas/DocumentPageResponseCommon"
+        - type: object
+
+    BarcodePageResponse:
+      allOf:
+        - $ref: "#/components/schemas/DocumentPageResponseCommon"
+        - type: object
+        - required:
+            - barcodes
+          properties:
+            barcodes:
+              type: array
+              items:
+                properties:                  
+                  barcodeId:
+                    type: string
+                    format: uuid
+                  customerReferenceId:
+                    type: string
+                    description: Customer provided identifier for the request     
+                  type:
+                    type: string
+                    default: PDF417
+                    enum:
+                      - PDF417
+                      - 1D
+                      - QR
+                    description: The type of barcode that was submitted
+                  status:
+                    type: string
+                    description: |
+                      The current status of the request associated to the page ID
+
+                      **PROCESSING**: Still processing (callback needed)
+
+                      **COMPLETED**: All details in the response
+
+                      **ERROR**: Transaction failed
+                    enum:
+                      - PROCESSING
+                      - COMPLETED
+                      - ERROR
+                  failureReasons:
+                    allOf:
+                      - $ref: "#/components/schemas/ProcessingFailureReasons"
+                      - type: object
+                        description: If the status is **ERROR**, array of reasons for the failure (code/description pairs)
+                        example: 
+                          500: The barcode could not be found.
+                          503: The barcode could not be processed.               
+
+    Classification:
+      type: object
+      readOnly: true
+      properties:
+        idDocument:
+          allOf:
+            - $ref: "#/components/schemas/DocumentClassification"
+            - type: object
+              properties:
+                pages:
+                  type: array
+                  items:
+                    allOf:
+                      - properties:
+                          pageId:
+                            type: string
+                            format: uuid
+                            description: Id for the page which corresponds to the classification
+                      - $ref: "#/components/schemas/DocumentPageClassification"
+
+    DocumentClassification:
+      type: object
+      properties:
+        documentType:
+          type: string
+          description: The type of document that the page is from
+          enum:
+            - PASSPORT
+            - DRIVERS_LICENSE
+            - IDENTIFICATION_CARD
+            - RESIDENCE_PERMIT
+        documentFeatures:
+          type: array
+          items:
+            type: string
+          description: Features present on the document
+          example: ["ENHANCED_DRIVERS_LICENSE", "REAL_ID", "UNDER_TWENTY_ONE"]
+        issuingCountry:
+          type: string
+          description: The issuing country of the document that the page is from
+          example: "USA"
+        issuingStateProvince:
+          type: string
+          description: The issuing state or province of the document that the page is from
+          example: "CA"
+        circulationYear:
+          type: string
+          description: The year the document editon went into circulation
+          example: "2017"
+
+    DocumentPageClassification:
+      allOf:
+        - $ref: "#/components/schemas/DocumentClassification"
+        - type: object
+          required:
+            - documentSection
+          properties:
+            documentSection:
+              type: string
+              description: The section of the document that the page is from
+              enum:
+                - FRONT
+                - BACK
+
+    Extraction:
+      type: object
+      readOnly: true
+      description: |
+        Object containing data extracted from the end user’s document. If final transaction results are still pending
+        (i.e. with an Agent), then this entire section will be empty.
+      properties:
+        merged:
+          allOf:
+            - description: Object containing merged extraction data for the end user
+            - $ref: "#/components/schemas/ExtractionData"
+        sources:
+          type: array
+          items:
+            properties:
+              referenceId:
+                type: string
+                format: uuid
+                description: Id for the object which corresponds to the extraction results
+              type:
+                type: string
+                enum:
+                  - OCR
+                  - MRZ
+                  - BARCODE
+                  - NFC
+              extractedData:
+                allOf:
+                  - $ref: "#/components/schemas/ExtractionData"
+                  - type: object
+                    properties:
+                      mrzInfo:
+                        type: object
+                        properties:
+                          mrzLine1:
+                            type: string
+                          mrzLine2:
+                            type: string
+                          mrzLine3:
+                            type: string
+                      
+            example:
+              referenceId: "13c13de1-4e6b-4021-bcfb-adb5855a8a12"
+              type: "MRZ"
+
+    ExtractionData:
+      type: object
+      properties:
+        name:
+          type: object
+          properties:
+            fullName:
+              type: string
+            prefix:
+              type: string
+            firstName:
+              type: string
+            middleName:
+              type: string
+            surname:
+              type: string
+            suffix:
+              type: string
+          additionalProperties: true
+        address:
+          type: object
+          properties:
+            address1:
+              type: string
+            address2:
+              type: string
+            address3:
+              type: string
+            rawAddress:
+              type: string
+            city:
+              type: string
+            stateProvince:
+              type: string
+            postalCode:
+              type: string
+            country:
+              type: string
+          additionalProperties: true
+        personalInfo:
+          type: object
+          properties:
+            sex:
+              type: string
+            dateOfBirth:
+              type: string
+              format: date
+            nationality:
+              type: string
+            placeOfBirth:
+              type: string
+            personalGovId:
+              type: string
+          additionalProperties: true
+        documentInfo:
+          type: object
+          properties:
+            licenseClass:
+              type: string
+            permitType:
+              type: string
+            documentNumber:
+              type: string
+            issuingAuthority:
+              type: string
+            placeOfIssue:
+              type: string
+            dateOfIssue:
+              type: string
+              format: date
+            dateOfExpiry:
+              type: string
+              format: date
+          additionalProperties: true
+      additionalProperties: true
+            
+    Verification:
+      type: object
+      description: |
+        Object containing identify verifiaction results. If final transaction results are still pending (i.e. with an
+        Agent), then this entire section will be empty.
+      readOnly: true
+      required:
+        - verified
+        - confidence
+        - documentVerifications
+        - biometricVerifications
+      properties:
+        verified:
+          type: boolean
+          description: Indicates whether the verifications performed with the evidence provided verifies an identity
+        confidence:
+          type: integer
+          description: Indicates the confidence level for the verified result
+          minimum: 0
+          maximum: 1000
+        documentVerification:
+          type: object
+          properties:
+            verified:
+              type: boolean
+              description: Indicates whether the document has been verified
+            fraudReasons:
+              type: array
+              items:
+                type: string
+              description: A collection of attack vectors or authentication categories where fraud was found
+              example: ["Barcode", "MRZ", "Biodata", "NFC", "Portrait", "Security Features", "Signature", "Structure"]
+        biometricVerification:
+          type: object
+          properties:
+            verified:
+              type: boolean
+              description: Indicates whether the biometric evidence to the document has been verified
+            fraudReasons:
+              type: array
+              items:
+                type: string
+              description: A collection of attack vectors or authentication categories where fraud was found
+              example: ["FACE COMPARISON", "FACE LIVENESS"]
+    
+    Nfc:
+      type: object
+      required:
+      - sod
+      - dataGroups
+      - portrait
+      properties:
+        sod:
+          type: string
+          description: Document security object hash
+          pattern: '^[a-fA-F0-9]+$'
+        portrait:
+          type: string
+          format: byte
+          description: Portrait image from the NFC chip
+        dataGroups:
+          type: object
+          required:
+            - dg1
+            - dg2
+          description: Contains 16 data groups (hex strings), each consisting of identity information
+          properties:
+            dg1:
+              type: string
+              pattern: '^[a-fA-F0-9]+$'
+            dg2:
+              type: string
+              pattern: '^[a-fA-F0-9]+$'
+            dg3:
+              type: string
+              pattern: '^[a-fA-F0-9]+$'
+            dg4:
+              type: string
+              pattern: '^[a-fA-F0-9]+$'
+            dg5:
+              type: string
+              pattern: '^[a-fA-F0-9]+$'
+            dg6:
+              type: string
+              pattern: '^[a-fA-F0-9]+$'
+            dg7:
+              type: string
+              pattern: '^[a-fA-F0-9]+$'
+            dg8:
+              type: string
+              pattern: '^[a-fA-F0-9]+$'
+            dg9:
+              type: string
+              pattern: '^[a-fA-F0-9]+$'
+            dg10:
+              type: string
+              pattern: '^[a-fA-F0-9]+$'
+            dg11:
+              type: string
+              pattern: '^[a-fA-F0-9]+$'
+            dg12:
+              type: string
+              pattern: '^[a-fA-F0-9]+$'
+            dg13:
+              type: string
+              pattern: '^[a-fA-F0-9]+$'
+            dg14:
+              type: string
+              pattern: '^[a-fA-F0-9]+$'
+            dg15:
+              type: string
+              pattern: '^[a-fA-F0-9]+$'
+            dg16:
+              type: string
+              pattern: '^[a-fA-F0-9]+$'
+        activeAuthInput:
+          type: object
+          description: Contains authentication inputs for accessing the NFC chip
+          required:
+            - ecdsaPublicKey
+            - signature
+            - challenge
+          properties:
+            ecdsaPublicKey:
+              type: string
+              description: Public key string
+              pattern: '^[a-fA-F0-9]+$'
+            signature:
+              type: string
+              description: Public key signature
+              pattern: '^[a-fA-F0-9]+$'
+            challenge:
+              type: string
+              description: Public key challenge
+              pattern: '^[a-fA-F0-9]+$'
+
+    ConfigurationRequest:
+      type: object
+      description: |
+        Object containing all transaction configurations - all configurations will have backing tenant-level settings,
+        so request-level configurations allow the customer to make modifications for individual transactions
+      properties:
+        verification:
+          type: object
+          description: Object containing transaction-level configurations related to the verification request
+          properties:
+            docVerify:
+              type: boolean
+              description: |
+                Indicator of whether the transaction requires document verification - this is a necessary configuration
+                because some transactions will be face comparison-only. If not specified, reference tenant-level settings,
+                otherwise default is true.
+            verifyLevel:
+              type: integer
+              minimum: 0
+              maximum: 3
+              description: |
+                Numeric indicator of the desired verification level for the transaction. If not specified, defaults apply.
+            agentReview:
+              type: boolean
+              description: |
+                Indicator that the transaction must go through an agent regardless of the verification level and document.
+                If not specified, reference tenant-level settings, otherwise default is false.
+            faceVerification:
+              type: boolean
+              writeOnly: true
+              description: |
+                Indicator of whether the transaction requires Face Comparison - generally required if both a document and
+                selfie are present. If not specified, reference tenant-level settings, otherwise default is false.
+                
+                NOTE: Face Comparison includes Face Liveness.
+        extraction:
+          anyOf:
+            - $ref: "#/components/schemas/ExtractionConfiguration"
+            - $ref: "#/components/schemas/ExtractionConfigurationCustomFields"
+        responseImages:
+          type: array
+          description: This is an array of the response image a customer may require. This format follows the existing V2 format.
+          items:
+            type: string
+
+    ExtractionConfiguration:
+      type: object
+      required:
+        - action
+      properties:
+        action:
+          type: string
+          description: |
+            Specifies an inclusive or exclusive action to take on a given set of fields. Inclusion/exclusion applies
+            for all instances of a field (e.g. personalGovId from page, MRZ, and barcode). The customer can:
+
+            **INCLUDE** all or specified extraction fields
+
+            **EXCLUDE** all or specified extraction fields
+
+            If blank, reference tenant-level settings, otherwise the default is **INCLUDE**.
+          enum:
+            - INCLUDE
+            - EXCLUDE
+
+    ExtractionConfigurationCustomFields:
+      allOf:
+        - $ref: "#/components/schemas/ExtractionConfiguration"
+        - type: object
+          required:
+            - action
+            - fields
+          properties:
+            fields:
+              type: array
+              description: |
+                Specifies the fields requiring inclusive or exclusive action. For excluded fields, Mobile Verify will
+                still return the field with a value of "REDACTED" if the field exists on the document. If a customer
+                tries to exclude a field outside the "extraction" data group, Mobile Verify will ignore the request.
+
+                * When this field is blank, that will mean "all" for inclusion or exclusion (i.e. include or exclude ALL fields)
+                * When action is not specified and this field is populated then this field will be ignored (i.e. "action"
+                is required when "fields" is populated)
+
+                Values can be any field name within the "extraction" data group in the response.
+              items:
+                type: string
+              example: ["Surname", "City", "DateOfBirth", "..."]
+
+    ConfigurationResponse:
+      type: object
+      required:
+        - verification
+      description: |
+        If final transaction results are still pending (i.e. with an Agent), then this entire section will be empty.
+      properties:
+        verification:
+          type: object
+          description: Object containing transaction-level configurations related to the verification request
+          required:
+            - docVerify
+            - verifyLevel
+            - agentReview
+            - faceComparison
+          properties:
+            docVerify:
+              type: boolean
+              description: |
+                Indicates whether the transaction included document verification.
+            verifyLevel:
+              type: integer
+              minimum: 0
+              maximum: 1
+              description: Numeric indicator of the transaction’s verification level.
+            agentReview:
+              type: boolean
+              description: Indicates whether the transaction went through an agent
+            faceComparison:
+              type: boolean
+              description: Indicates whether the transaction included face comparison
+        extraction:
+          $ref: "#/components/schemas/ExtractionConfigurationCustomFields"
+        responseImages:
+          type: array
+          description: Array listing the requested response images.
+          items:
+            type: string
+            example: ['CroppedPortrait', 'CroppedSignature', 'CroppedDocument']
+
+
+    ResponseImages:
+      type: object
+      description: |
+        if the transaction included a request for response images, the base64 for those images will appear here
+      properties:
+        croppedPortrait:
+          type: object
+          description: when the response image is a cropped portrait, the information goes here
+          properties:
+            referenceId:
+              type: string
+              format: uuid
+              description: Pointer back to the image from which the image was extracted
+            data:
+              type: string
+              format: byte
+              description: Base64 data for the response image
+        croppedSignature:
+          type: object
+          description: when the response image is a cropped signature, the information goes here
+          properties:
+            referenceId:
+              type: string
+              format: uuid
+              description: Pointer back to the image from which the image was extracted
+            data:
+              type: string
+              format: byte
+              description: Base64 data for the response image
+        croppedDocument:
+          type: array
+          description:  when the response image is a cropped document, the information goes here. We will support two of these sections to accommodate each side of the document
+          items:
+            type: object
+            properties:
+              referenceId:
+                type: string
+                format: uuid
+                description: Pointer back to the image from which the image was extracted
+              data:
+                type: string
+                format: byte
+                description: Base64 data for the response image
+
+    CaptureDetail:
+      type: object
+      required:
+        - method
+      properties:
+        method:
+          type: string
+          description: The method used for document capture
+          enum:
+            - MISNAP
+            - UNKNOWN
+        mode:
+          type: string
+          description: Indicates whether the image was captured using auto or manual capture
+          enum:
+            - AUTO
+            - MANUAL
+            - UNKNOWN
+        platform:
+          type: string
+          description: Platform on which the document was captured
+          enum:
+            - IOS
+            - ANDROID
+            - MOBILE_WEB
+            - DESKTOP_WEB
+        userAgent:
+          type: string
+          description: If image was captured on a web platform, the user agent that was used
+          example: Mozilla/5.0 (iPhone; CPU iPhone OS 14_1 like Mac OS X)
+      example:
+        method: "MISNAP"
+        mode: "AUTO"
+        platform: "MOBILE_WEB"
+        userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 14_1 like Mac OS X)"
+
+    TransactionPollingResult:
+      type: array
+      items:
+        $ref: "#/components/schemas/TransactionPollingItem"
+        
+    TransactionPollingItem:
+      type: object
+      required:
+        - requestId
+        - processingStatus
+        - requestDate
+        - expiryDate
+        - responseRetrieved
+      properties:
+        requestId:
+          type: string
+          description: |
+            A specific request ID (transaction identifier) associated to a single transaction submitted by the customer
+          format: uuid
+          readOnly: true
+        customerReferenceId:
+          type: string
+          description: The optional CustomerReferenceID value that was submitted with the original request.
+          readOnly: true
+        service:
+          type: string
+          description: |
+            Type of service requested
+
+            **VERIFY**: Mitek Mobile Verify
+
+            **VERIFY_MANUAL**: Mitek Mobile Verify Manual
+
+            **FILL_MANUAL**: Mitek Mobile Fill Manual
+
+            **VERIFY_EXPERT**: Mitek Mobile Verify Expert
+
+            **FACECOMPARE_MANUAL**: Mitek Manual Face Compare
+          readOnly: true
+          enum:
+            - VERIFY
+            - VERIFY_MANUAL
+            - FILL_MANUAL
+            - VERIFY_EXPERT
+            - FACECOMPARE_MANUAL
+        retrievalId:
+          type: string
+          description: Unique identifier used for the retrieval of the final result.
+          format: uuid
+          readOnly: true
+        processingStatus:
+          type: string
+          description: |
+            The current status of the request associated to the request ID
+
+            **PENDING**: The document is still being reviewed by the manual review and/or expert teams
+
+            **COMPLETE**: Manual processing of the submitted document has completed and the results are available for
+            retrieval from the appropriate retrieval API
+          readOnly: true
+          enum:
+            - PENDING
+            - COMPLETE
+        requestDate:
+          type: string
+          description: The date/time the request was made
+          format: date-time
+          example: "2021-04-21T17:32:28Z"
+        expiryDate:
+          type: string
+          description: The date/time that the transaction will be purged from polling (should match customer retention settings).
+          format: date-time
+          example: "2021-07-21T17:32:28Z"
+        responseRetrieved:
+          type: boolean
+          description: Indicates whether the transaction has already been retrieved via the retrieval endpoint or via synchronous response.
+
+    ProcessingFailureReasons:
+      type: object
+      properties:
+        200:
+          type: string
+          default: Image is too blurry.
+          description: The image has failed sharpness image quality check.
+        201:
+          type: string
+          default: The image is not sharp.
+          description: The image is out of focus.
+        202:
+          type: string
+          default: The image has glare.
+          description: Glare was found on the document preventing extraction or authentication.
+        203:
+          type: string
+          default: The image is too dark.
+          description: The image is too dark.
+        204:
+          type: string
+          default: The document on the image is too small. The amount of the image that the document takes up is too small.
+          description: Retake Image - Try changing from portrait to landscape mode or getting closer to the image.
+        205:
+          type: string
+          default: |
+            The ID document could not be found. This can be caused by the image not showing all four corners of the
+            document.
+          description: Retake Image - Ensure all four sides of the document are visible.
+        206:
+          type: string
+          default: The type of ID document could not be determined.
+          description: |
+            The type of document could not be identified. This could be caused by a low quality image or it could be a
+            document that is not supported.
+        207:
+          type: string
+          default: |
+            The pose of the document could not be determined. This means the orientation of the document could not be
+            determined and extraction could not continue.
+          description: Retake Image
+        208:
+          type: string
+          default: |
+            Invalid Image Type The encoding of the image is incorrect. It is not in a format that Mitek is able to
+            process.
+          description: Take a new image in a supported format.
+        209:
+          type: string
+          default: Image is too small The input image had a width or height less than 400 pixels.
+          description: Take a larger image.
+        210:
+          type: string
+          default: |
+            Image processing failed after resizing. The input image had a width or height greater than 2000 pixels and
+            was resized. You will only receive this message if processing failed after resizing.
+          description: Take a smaller image.
+        211:
+          type: string
+          default: The authenticator could not run because the input image was missing
+          description: |
+            The authenticator was not able to assess the document because the input image was missing. Ensure that at
+            least one image of an identity document was captured and submitted in the service request.
+        212:
+          type: string
+          default: The image quality of the authenticator input image was poor.
+          description: |
+            The authenticator was not able to assess the document because the image quality was too poor. Have the
+            consumer capture a better quality image.
+        500:
+          type: string
+          default: The barcode could not be found.
+          description: The document was classified as a type that contains a barcode but the barcode could not be found.
+        501:
+          type: string
+          default: The barcode could not be extracted.
+          description: The barcode was found but could not be read.
+        502:
+          type: string
+          default: The barcode could not be parsed.
+          description: The barcode was read but the resulting data was not in the expected format.
+        503:
+          type: string
+          default: The barcode could not be processed
+          description: A problem was encountered when trying to process barcode extraction and parsing.
+        510:
+          type: string
+          default: No data could be extracted for this document.
+          description: Data could not be extracted
+        511:
+          type: string
+          default: Data could not be extracted from the back of the document.
+          description: Data could not be extracted from the back of the document.
+        512:
+          type: string
+          default: The front of the ID document could not be extracted.
+          description: The front of the ID document could not be extracted.
+        513:
+          type: string
+          default: Data could not be extracted from the document.
+          description: Retake Image
+        520:
+          type: string
+          default: Data extraction was performed, but the system didn't accept the results.
+          description: The data was extracted, but did not pass our additional checks to ensure the extraction is accurate.
+      additionalProperties: true
+
+    SimulatedContentObject:
+      description: Headers used for Development Purposes to manipulate returned response in order to see examples of certain scenarios.
+      type: object
+      properties:
+        returnDocumentImageEvidence: 
+          type: boolean
+          default: false
+        returnBarcodeEvidence: 
+          type: boolean
+          default: false
+        docFraudPortraitZone: 
+          type: boolean
+          default: false
+        docFraudDocStructure: 
+          type: boolean
+          default: false
+        docFraudBioDataConsistency: 
+          type: boolean
+          default: false        
+        docFraudBioDataFonts: 
+          type: boolean
+          default: false
+        biometricFraudFaceComparison: 
+          type: boolean
+          default: false
+        biometricFraudFaceLiveness: 
+          type: boolean
+          default: false
+        acceptanceFailure: 
+          type: boolean
+          default: false
+        extractionFailure: 
+          type: boolean
+          default: false
+        classificationFailure: 
+          type: boolean
+          default: false
+        docFraudBarcode:
+          type: boolean
+          default: false
+        docFraudGeneralFraud:
+          type: boolean
+          default: false
+        docFraudIncompleteEvidence:
+          type: boolean
+          default: false
+        docFraudKnownFraud:
+          type: boolean
+          default: false
+        docFraudMrzFonts:
+          type: boolean
+          default: false
+        docFraudMrzCheckDigit:
+          type: boolean
+          default: false
+        docFraudNfc:
+          type: boolean
+          default: false
+        docFraudPhotocopy:
+          type: boolean
+          default: false
+        docFraudSecurityFeatures:
+          type: boolean
+          default: false
+        forceSynchronous:
+          type: boolean
+          default: false
+        extractionOperation: 
+          type: string
+          default: 'include'
+        extractionItems:
+          type: array
+          items:
+            type: string
+
+    SimulatedContentString:
+      description: A string representation of the X-Simulated-Content header for when it need to be serialized.
+      type: string
+
+    oauth2TokenResponse:
+      description: The Access Token Response
+      type: object
+      properties:
+        access_token:
+          type: string
+        expires_in:
+          type: integer
+          format: int64
+        token_type:
+          type: string
+        scope:
+          type: string
+
+    genericError:
+      description: Error responses are sent when an error (e.g. unauthorized, bad request, ...) occurred.
+      type: object
+      title: Error response
+      required:
+        - error
+      properties:
+        debug:
+          description: Debug contains debug information. This is usually not available and has to be enabled.
+          type: string
+          example: The database adapter was unable to find the element
+        error:
+          description: Name is the error name.
+          type: string
+          example: The requested resource could not be found
+        error_description:
+          description: Description contains further information on the nature of the error.
+          type: string
+          example: Object with ID 12345 does not exist
+        status_code:
+          description: Code represents the error status code (404, 403, 401, ...).
+          type: integer
+          format: int64
+          example: 404
+  
+  examples:
+    AllGoodHeaders:
+      value:
+        returnDocumentImageEvidence: true
+        returnBarcodeEvidence: true
+        docFraudBarcode: false
+        docFraudBioDataConsistency: false
+        docFraudBioDataFonts: false
+        docFraudGeneralFraud: false
+        docFraudIncompleteEvidence: false
+        docFraudKnownFraud: false
+        docFraudMrzFonts: false
+        docFraudMrzCheckDigit: false
+        docFraudNfc: false
+        docFraudPhotocopy: false
+        docFraudPortraitZone: false
+        docFraudSecurityFeatures: false
+        docFraudDocStructure: false
+        biometricFraudFaceComparison: false
+        biometricFraudFaceLiveness: false
+        acceptanceFailure: false
+        extractionFailure: false
+        classificationFailure: false
+        forceSynchronous: false
+    AcceptanceFailureHeaders:
+      value:
+        returnDocumentImageEvidence: true
+        returnBarcodeEvidence: true
+        docFraudBarcode: false
+        docFraudBioDataConsistency: false
+        docFraudBioDataFonts: false
+        docFraudGeneralFraud: false
+        docFraudIncompleteEvidence: false
+        docFraudKnownFraud: false
+        docFraudMrzFonts: false
+        docFraudMrzCheckDigit: false
+        docFraudNfc: false
+        docFraudPhotocopy: false
+        docFraudPortraitZone: false
+        docFraudSecurityFeatures: false
+        docFraudDocStructure: false
+        biometricFraudFaceComparison: false
+        biometricFraudFaceLiveness: false
+        acceptanceFailure: true
+        extractionFailure: false
+        classificationFailure: false
+        forceSynchronous: false
+    ExtractionFailureHeaders:
+      value:
+        returnDocumentImageEvidence: true
+        returnBarcodeEvidence: true
+        docFraudBarcode: false
+        docFraudBioDataConsistency: false
+        docFraudBioDataFonts: false
+        docFraudGeneralFraud: false
+        docFraudIncompleteEvidence: false
+        docFraudKnownFraud: false
+        docFraudMrzFonts: false
+        docFraudMrzCheckDigit: false
+        docFraudNfc: false
+        docFraudPhotocopy: false
+        docFraudPortraitZone: false
+        docFraudSecurityFeatures: false
+        docFraudDocStructure: false
+        biometricFraudFaceComparison: false
+        biometricFraudFaceLiveness: false
+        acceptanceFailure: false
+        extractionFailure: true
+        classificationFailure: false
+        forceSynchronous: false
+    ClassificationFailureHeaders:
+      value:
+      
+      
+    DocFraudPortraitZoneHeaders:
+      value:
+        returnDocumentImageEvidence: true
+        returnBarcodeEvidence: true
+        docFraudBarcode: false
+        docFraudBioDataConsistency: false
+        docFraudBioDataFonts: false
+        docFraudGeneralFraud: false
+        docFraudIncompleteEvidence: false
+        docFraudKnownFraud: false
+        docFraudMrzFonts: false
+        docFraudMrzCheckDigit: false
+        docFraudNfc: false
+        docFraudPhotocopy: false
+        docFraudPortraitZone: true
+        docFraudSecurityFeatures: false
+        docFraudDocStructure: false
+        biometricFraudFaceComparison: false
+        biometricFraudFaceLiveness: false
+        acceptanceFailure: false
+        extractionFailure: false
+        classificationFailure: false
+        forceSynchronous: false
+    DocFraudDocStructureHeaders:
+      value:
+        returnDocumentImageEvidence: true
+        returnBarcodeEvidence: true
+        docFraudBarcode: false
+        docFraudBioDataConsistency: false
+        docFraudBioDataFonts: false
+        docFraudGeneralFraud: false
+        docFraudIncompleteEvidence: false
+        docFraudKnownFraud: false
+        docFraudMrzFonts: false
+        docFraudMrzCheckDigit: false
+        docFraudNfc: false
+        docFraudPhotocopy: false
+        docFraudPortraitZone: false
+        docFraudSecurityFeatures: false
+        docFraudDocStructure: true
+        biometricFraudFaceComparison: false
+        biometricFraudFaceLiveness: false
+        acceptanceFailure: false
+        extractionFailure: false
+        classificationFailure: false
+        forceSynchronous: false
+    DocFraudBioDataConsistencyHeaders:
+      value:
+        returnDocumentImageEvidence: true
+        returnBarcodeEvidence: true
+        docFraudBarcode: false
+        docFraudBioDataConsistency: true
+        docFraudBioDataFonts: false
+        docFraudGeneralFraud: false
+        docFraudIncompleteEvidence: false
+        docFraudKnownFraud: false
+        docFraudMrzFonts: false
+        docFraudMrzCheckDigit: false
+        docFraudNfc: false
+        docFraudPhotocopy: false
+        docFraudPortraitZone: false
+        docFraudSecurityFeatures: false
+        docFraudDocStructure: false
+        biometricFraudFaceComparison: false
+        biometricFraudFaceLiveness: false
+        acceptanceFailure: false
+        extractionFailure: false
+        classificationFailure: false
+        forceSynchronous: false
+    DocFraudBioDataFontsHeaders:
+      value:
+        returnDocumentImageEvidence: true
+        returnBarcodeEvidence: true
+        docFraudBarcode: false
+        docFraudBioDataConsistency: false
+        docFraudBioDataFonts: true
+        docFraudGeneralFraud: false
+        docFraudIncompleteEvidence: false
+        docFraudKnownFraud: false
+        docFraudMrzFonts: false
+        docFraudMrzCheckDigit: false
+        docFraudNfc: false
+        docFraudPhotocopy: false
+        docFraudPortraitZone: false
+        docFraudSecurityFeatures: false
+        docFraudDocStructure: false
+        biometricFraudFaceComparison: false
+        biometricFraudFaceLiveness: false
+        acceptanceFailure: false
+        extractionFailure: false
+        classificationFailure: false
+        forceSynchronous: false
+    DocFraudBarcodeHeaders:
+      value:
+        returnDocumentImageEvidence: true
+        returnBarcodeEvidence: true
+        docFraudBarcode: true
+        docFraudBioDataConsistency: false
+        docFraudBioDataFonts: false
+        docFraudGeneralFraud: false
+        docFraudIncompleteEvidence: false
+        docFraudKnownFraud: false
+        docFraudMrzFonts: false
+        docFraudMrzCheckDigit: false
+        docFraudNfc: false
+        docFraudPhotocopy: false
+        docFraudPortraitZone: false
+        docFraudSecurityFeatures: false
+        docFraudDocStructure: false
+        biometricFraudFaceComparison: false
+        biometricFraudFaceLiveness: false
+        acceptanceFailure: false
+        extractionFailure: false
+        classificationFailure: false
+        forceSynchronous: false
+    DocFraudGeneralFraudHeaders:
+      value:
+        returnDocumentImageEvidence: true
+        returnBarcodeEvidence: true
+        docFraudBarcode: false
+        docFraudBioDataConsistency: false
+        docFraudBioDataFonts: false
+        docFraudGeneralFraud: true
+        docFraudIncompleteEvidence: false
+        docFraudKnownFraud: false
+        docFraudMrzFonts: false
+        docFraudMrzCheckDigit: false
+        docFraudNfc: false
+        docFraudPhotocopy: false
+        docFraudPortraitZone: false
+        docFraudSecurityFeatures: false
+        docFraudDocStructure: false
+        biometricFraudFaceComparison: false
+        biometricFraudFaceLiveness: false
+        acceptanceFailure: false
+        extractionFailure: false
+        classificationFailure: false
+        forceSynchronous: false
+    DocFraudIncompleteEvidenceHeaders:
+      value:
+        returnDocumentImageEvidence: true
+        returnBarcodeEvidence: true
+        docFraudBarcode: false
+        docFraudBioDataConsistency: false
+        docFraudBioDataFonts: false
+        docFraudGeneralFraud: false
+        docFraudIncompleteEvidence: true
+        docFraudKnownFraud: false
+        docFraudMrzFonts: false
+        docFraudMrzCheckDigit: false
+        docFraudNfc: false
+        docFraudPhotocopy: false
+        docFraudPortraitZone: false
+        docFraudSecurityFeatures: false
+        docFraudDocStructure: false
+        biometricFraudFaceComparison: false
+        biometricFraudFaceLiveness: false
+        acceptanceFailure: false
+        extractionFailure: false
+        classificationFailure: false
+        forceSynchronous: false
+    DocFraudKnownFraudHeaders:
+      value:
+        returnDocumentImageEvidence: true
+        returnBarcodeEvidence: true
+        docFraudBarcode: false
+        docFraudBioDataConsistency: false
+        docFraudBioDataFonts: false
+        docFraudGeneralFraud: false
+        docFraudIncompleteEvidence: false
+        docFraudKnownFraud: true
+        docFraudMrzFonts: false
+        docFraudMrzCheckDigit: false
+        docFraudNfc: false
+        docFraudPhotocopy: false
+        docFraudPortraitZone: false
+        docFraudSecurityFeatures: false
+        docFraudDocStructure: false
+        biometricFraudFaceComparison: false
+        biometricFraudFaceLiveness: false
+        acceptanceFailure: false
+        extractionFailure: false
+        classificationFailure: false
+        forceSynchronous: false
+    DocFraudMrzFontsHeaders:
+      value:
+        returnDocumentImageEvidence: true
+        returnBarcodeEvidence: true
+        docFraudBarcode: false
+        docFraudBioDataConsistency: false
+        docFraudBioDataFonts: false
+        docFraudGeneralFraud: false
+        docFraudIncompleteEvidence: false
+        docFraudKnownFraud: false
+        docFraudMrzFonts: true
+        docFraudMrzCheckDigit: false
+        docFraudNfc: false
+        docFraudPhotocopy: false
+        docFraudPortraitZone: false
+        docFraudSecurityFeatures: false
+        docFraudDocStructure: false
+        biometricFraudFaceComparison: false
+        biometricFraudFaceLiveness: false
+        acceptanceFailure: false
+        extractionFailure: false
+        classificationFailure: false
+        forceSynchronous: false
+    DocFraudMrzCheckDigitHeaders:
+      value:
+        returnDocumentImageEvidence: true
+        returnBarcodeEvidence: true
+        docFraudBarcode: false
+        docFraudBioDataConsistency: false
+        docFraudBioDataFonts: false
+        docFraudGeneralFraud: false
+        docFraudIncompleteEvidence: false
+        docFraudKnownFraud: false
+        docFraudMrzFonts: false
+        docFraudMrzCheckDigit: true
+        docFraudNfc: false
+        docFraudPhotocopy: false
+        docFraudPortraitZone: false
+        docFraudSecurityFeatures: false
+        docFraudDocStructure: false
+        biometricFraudFaceComparison: false
+        biometricFraudFaceLiveness: false
+        acceptanceFailure: false
+        extractionFailure: false
+        classificationFailure: false
+        forceSynchronous: false
+    DocFraudNfcHeaders:
+      value:
+        returnDocumentImageEvidence: true
+        returnBarcodeEvidence: true
+        docFraudBarcode: false
+        docFraudBioDataConsistency: false
+        docFraudBioDataFonts: false
+        docFraudGeneralFraud: false
+        docFraudIncompleteEvidence: false
+        docFraudKnownFraud: false
+        docFraudMrzFonts: false
+        docFraudMrzCheckDigit: false
+        docFraudNfc: true
+        docFraudPhotocopy: false
+        docFraudPortraitZone: false
+        docFraudSecurityFeatures: false
+        docFraudDocStructure: false
+        biometricFraudFaceComparison: false
+        biometricFraudFaceLiveness: false
+        acceptanceFailure: false
+        extractionFailure: false
+        classificationFailure: false
+        forceSynchronous: false
+    DocFraudPhotocopyHeaders:
+      value:
+        returnDocumentImageEvidence: true
+        returnBarcodeEvidence: true
+        docFraudBarcode: false
+        docFraudBioDataConsistency: false
+        docFraudBioDataFonts: false
+        docFraudGeneralFraud: false
+        docFraudIncompleteEvidence: false
+        docFraudKnownFraud: false
+        docFraudMrzFonts: false
+        docFraudMrzCheckDigit: false
+        docFraudNfc: false
+        docFraudPhotocopy: true
+        docFraudPortraitZone: false
+        docFraudSecurityFeatures: false
+        docFraudDocStructure: false
+        biometricFraudFaceComparison: false
+        biometricFraudFaceLiveness: false
+        acceptanceFailure: false
+        extractionFailure: false
+        classificationFailure: false
+        forceSynchronous: false
+    DocFraudSecurityFeaturesHeaders:
+      value:
+        returnDocumentImageEvidence: true
+        returnBarcodeEvidence: true
+        docFraudBarcode: false
+        docFraudBioDataConsistency: false
+        docFraudBioDataFonts: false
+        docFraudGeneralFraud: false
+        docFraudIncompleteEvidence: false
+        docFraudKnownFraud: false
+        docFraudMrzFonts: false
+        docFraudMrzCheckDigit: false
+        docFraudNfc: false
+        docFraudPhotocopy: false
+        docFraudPortraitZone: false
+        docFraudSecurityFeatures: true
+        docFraudDocStructure: false
+        biometricFraudFaceComparison: false
+        biometricFraudFaceLiveness: false
+        acceptanceFailure: false
+        extractionFailure: false
+        classificationFailure: false
+        forceSynchronous: false
+    BiometricFraudFaceComparisonHeaders:
+      value:
+        returnDocumentImageEvidence: true
+        returnBarcodeEvidence: true
+        docFraudBarcode: false
+        docFraudBioDataConsistency: false
+        docFraudBioDataFonts: false
+        docFraudGeneralFraud: false
+        docFraudIncompleteEvidence: false
+        docFraudKnownFraud: false
+        docFraudMrzFonts: false
+        docFraudMrzCheckDigit: false
+        docFraudNfc: false
+        docFraudPhotocopy: false
+        docFraudPortraitZone: false
+        docFraudSecurityFeatures: false
+        docFraudDocStructure: false
+        biometricFraudFaceComparison: true
+        biometricFraudFaceLiveness: false
+        acceptanceFailure: false
+        extractionFailure: false
+        classificationFailure: false
+        forceSynchronous: false
+    BiometricFraudFaceLivenessHeaders:
+      value:
+        returnDocumentImageEvidence: true
+        returnBarcodeEvidence: true
+        docFraudBarcode: false
+        docFraudBioDataConsistency: false
+        docFraudBioDataFonts: false
+        docFraudGeneralFraud: false
+        docFraudIncompleteEvidence: false
+        docFraudKnownFraud: false
+        docFraudMrzFonts: false
+        docFraudMrzCheckDigit: false
+        docFraudNfc: false
+        docFraudPhotocopy: false
+        docFraudPortraitZone: false
+        docFraudSecurityFeatures: false
+        docFraudDocStructure: false
+        biometricFraudFaceComparison: false
+        biometricFraudFaceLiveness: true
+        acceptanceFailure: false
+        extractionFailure: false
+        classificationFailure: false
+        forceSynchronous: false
+    SampleVerifyResponse:
+      value:
+        requestId: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+        createdDateTime: '2017-07-21T17:32:28Z'
+        customerReferenceId: 072d46df-ad0f-4977-a935-731fbcde5b69
+        Mitek-Server-Processing-Time: 15
+        Mitek-Request-Id: 4c52b0ef-aa28-4675-85d7-207b00486520
+        processingInfo:
+          status: PROCESSING
+          pages:
+            - pageId: 726cf3f7-cc34-665e-8daa-04b3741735f5
+              customerReferenceId: 072d46df-ad0f-4977-a935-731fbcde5b69
+              status: COMPLETED
+              captureDetail:
+                method: MISNAP
+                mode: AUTO
+                platform: MOBILE_WEB
+                userAgent: Mozilla/5.0 (iPhone; CPU iPhone OS 14_1 like Mac OS X)
+            - pageId: 13c13de1-4e6b-4021-bcfb-adb5855a8a12
+              customerReferenceId: 072d46df-ad0f-4977-a935-731fbcde5b69
+              status: COMPLETED
+              captureDetail:
+                method: MISNAP
+                mode: AUTO
+                platform: MOBILE_WEB
+                userAgent: Mozilla/5.0 (iPhone; CPU iPhone OS 14_1 like Mac OS X)
+          barcodes:
+            - barcodeId: a437b9dd-31d2-4dc7-b871-38e31a2bdf81
+              type: PDF417
+              customerReferenceId: 11a85f64-5717-4562-b3fc-2c963f66afa6
+              status: COMPLETED
+            - barcodeId: ed74834b-206f-4f27-810e-0756b27295c6
+              type: QR
+              customerReferenceId: 11a85f64-5717-4562-b3fc-2c963f66afa6
+              status: ERROR
+              failureReasons:
+                503: The barcode could not be processed
+          selfie:
+            status: FAILED
+            failureReasons: ["201: “The image is not sharp”"]
+            captureDetail:
+              method: MISNAP
+              mode: AUTO
+              platform: MOBILE_WEB
+              userAgent: Mozilla/5.0 (iPhone; CPU iPhone OS 14_1 like Mac OS X)
+        classification:
+          idDocument:
+            documentType: PASSPORT
+            documentFeatures:
+            - ENHANCED_DRIVERS_LICENSE
+            - REAL_ID
+            - UNDER_TWENTY_ONE
+            issuingCountry: USA
+            issuingStateProvince: CA
+            circulationYear: '2017'
+            pages:
+            - pageId: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+              documentSection: FRONT
+              documentType: PASSPORT
+              documentFeatures:
+              - ENHANCED_DRIVERS_LICENSE
+              - REAL_ID
+              - UNDER_TWENTY_ONE
+              issuingCountry: USA
+              issuingStateProvince: CA
+              circulationYear: '2017'
+        extraction:
+          merged:
+            name:
+              fullName: John P Smith
+              prefix: ''
+              firstName: John
+              middleName: P
+              suffix: ''
+            address:
+              address1: 123 Main St.
+              address2: Apt 4A
+              address3: ''
+              stateProvince: CA
+              postalCode: '92101'
+              country: USA
+            personalInfo:
+              sex: MALE
+              nationality: USA
+              placeOfBirth: San Diego, CA USA
+              personalGovId: '1234567890'
+            documentInfo:
+              licenseClass: C
+              permitType: Student
+              documentNumber: '1234567890'
+              issuingAuthority: USA
+              placeOfIssue: San Diego, CA USA
+              dateOfIssue: '2021-06-01'
+              dateOfExpiry: '2026-05-31'
+          sources:
+          - referenceId: 13c13de1-4e6b-4021-bcfb-adb5855a8a12
+            type: OCR
+            extractedData:
+              name:
+                fullName: John P Smith
+                prefix: ''
+                firstName: John
+                middleName: P
+                suffix: ''
+              address:
+                address1: 123 Main St.
+                address2: Apt 4A
+                address3: ''
+                stateProvince: CA
+                postalCode: '92101'
+                country: USA
+              personalInfo:
+                sex: MALE
+                nationality: USA
+                placeOfBirth: San Diego, CA USA
+                personalGovId: '1234567890'
+              documentInfo:
+                licenseClass: C
+                permitType: Student
+                documentNumber: '1234567890'
+                issuingAuthority: USA
+                placeOfIssue: San Diego, CA USA
+                dateOfIssue: '2026-05-31'
+                dateOfExpiry: '2021-06-01'
+          - referenceId: 13c13de1-4e6b-4021-bcfb-adb5855a8a12
+            type: MRZ
+            extractedData:
+              mrzInfo:
+                mrzLine1: P<TEST<TEST<<JOHN<SMITH<<<<<<<<<<<<<<<<<<<<<
+                mrzLine2: A1B2C3D4E5F6G7H8I9J0K1LMNOPQRSTUVWXYZ<<<<<99
+                mrzLine3: ''
+              name:
+                fullName: JOHN SMITH
+                prefix: ''
+                firstName: JOHN
+                middleName: ''
+                suffix: ''
+              personalInfo:
+                sex: M
+                nationality: USA
+              documentInfo:
+                documentNumber: '1234567890'
+                issuingAuthority: USA
+                dateOfIssue: '2026-05-31'
+                dateOfExpiry: '2021-06-01'
+        verification:
+          verified: false
+          confidence: 0
+          documentVerification:
+            verified: false
+            fraudReasons:
+            - Barcode
+            - MRZ
+            - Biodata
+            - NFC
+            - Portrait
+            - Security Features
+            - Signature
+            - Structure
+          biometricVerification:
+            verified: false
+            fraudReasons:
+            - FACE COMPARISON
+            - FACE LIVENESS
+        configuration:
+          verification:
+            docVerify: true
+            verifyLevel: 0
+            agentReview: true
+            faceComparison: true
+          extraction:
+            action: INCLUDE
+            fields: ["Surname", "City", "DateOfBirth"]
+          responseImages:
+            - CroppedPortrait
+            - CroppedSignature
+            - CroppedDocument
+        responseImages:
+          croppedPortrait:
+            referenceId: "4c52b0ef-aa28-4675-85d7-207b00486520"
+            data: SGVsbG8sIFdvcmxkIQ==            
+          croppedSignature:
+            referenceId: "4c52b0ef-aa28-4675-85d7-207b00486520"
+            data: SGVsbG8sIFdvcmxkIQ==
+          croppedDocument:
+            - referenceId: "4c52b0ef-aa28-4675-85d7-207b00486520"
+              data: SGVsbG8sIFdvcmxkIQ==
+            - referenceId: "4c52b0ef-aa28-4675-85d7-207b00486520"
+              data: SGVsbG8sIFdvcmxkIQ==
+
+  responses:
+    NotAuthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+              $ref: "#/components/schemas/Error"
+          example:
+            requestId: "4ba0337b-d88d-4a9e-8e1d-fd30db079b85"
+            message: "The token is either invalid, malformed, inactive, or missing the required scopes"
+
+    Forbidden:
+      description: Forbidden
+      content:
+        application/json:
+          schema:
+              $ref: "#/components/schemas/Error"
+          example:
+            requestId: "4ba0337b-d88d-4a9e-8e1d-fd30db079b85"
+            message: "Forbidden"
+
+    NotFound:
+      description: Not Found
+      content:
+        application/json:
+          schema:
+              $ref: "#/components/schemas/Error"
+          example:
+            requestId: "4ba0337b-d88d-4a9e-8e1d-fd30db079b85"
+            message: "The result you attempted to retrieve does not exist."
+
+    RequestTimeout:
+      description: Request Timeout
+      content:
+        text/plain:
+          schema:
+            type: string
+            example: "Request Timeout"
+
+    TooManyRequests:
+      description: Too Many Requests
+      content:
+        text/plain:
+          schema:
+            type: string
+            example: "Too Many Requests"
+
+    InternalServerError:
+      description: Internal Server Error
+      content:
+        application/json:
+          schema:
+              $ref: "#/components/schemas/Error"
+          example:
+            message: "An internal error has occurred. Please try again in a few minutes."
+
+    ServiceUnavailable:
+      description: Service Unavailable
+      content:
+        text/plain:
+          schema:
+            type: string
+            example: "Service Unavailable"
